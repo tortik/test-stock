@@ -34,22 +34,30 @@ public class StockDataProcessor {
     }
 
     public void printAverageOpenWithSigmaClosed(String fromDate, String toDate, String apiKey, String equityName) {
-        if (!DateUtils.isValidDate(fromDate) && !DateUtils.isValidDate(toDate)) {
-            System.out.format("Date format is incorrect either for startDate or endDate. Please use pattern %s", DATE_FORMAT);
+        if (!DateUtils.isValidDate(fromDate) || !DateUtils.isValidDate(toDate)) {
+            System.out.format("Date format is incorrect either for startDate or endDate. Please use pattern %s\n", DATE_FORMAT);
             return;
         }
         LocalDate startDay = transform(fromDate);
         LocalDate endDay = transform(toDate);
         TimeSeries series = startDay.isEqual(endDay) ? INTRADAY : TimeSeries.DAILY;
-        JsonObject response = stockService.getStockRates(series, Optional.of(apiKey), equityName);
-        Set<String> datesToFilter = getJsonKeysToProcess(startDay, endDay, response);
+        Optional<JsonObject> response = stockService.getStockRates(series, Optional.of(apiKey), equityName);
+        response.ifPresent((json) -> {
+            Set<String> datesToFilter = getJsonKeysToProcess(startDay, endDay, json);
+            printOpenAverageRate(json, datesToFilter);
+            printSigmaClosedRate(json, datesToFilter);
+        });
+    }
 
-        BigDecimal openAverage = calculateAverageRate(response, datesToFilter, OPEN);
+    private void printSigmaClosedRate(JsonObject response, Set<String> datesToFilter) {
         BigDecimal closeAverage = calculateAverageRate(response, datesToFilter, CLOSE);
         double closedSigma = calculateSigma(response, datesToFilter, CLOSE, closeAverage);
-        printResult(openAverage.doubleValue());
         printResult(closedSigma);
+    }
 
+    private void printOpenAverageRate(JsonObject response, Set<String> datesToFilter) {
+        BigDecimal openAverage = calculateAverageRate(response, datesToFilter, OPEN);
+        printResult(openAverage.doubleValue());
     }
 
     private BigDecimal calculateAverageRate(JsonObject data, Set<String> daysToProcess, ResponseJsonKey key) {
